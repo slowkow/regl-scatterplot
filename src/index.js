@@ -11,21 +11,9 @@ import earcut from 'earcut';
 import { mat4, vec4 } from 'gl-matrix';
 import createPubSub from 'pub-sub-es';
 import createLine from 'regl-line';
-
-import createKdbush from './kdbush.js';
-import createLassoManager from './lasso-manager/index.js';
-import createRenderer from './renderer.js';
-
+import { version } from '../package.json';
 import BG_FS from './bg.fs';
 import BG_VS from './bg.vs';
-import POINT_SIMPLE_FS from './point-simple.fs';
-import POINT_UPDATE_FS from './point-update.fs';
-import POINT_UPDATE_VS from './point-update.vs';
-import POINT_FS from './point.fs';
-import createVertexShader from './point.vs';
-
-import createSplineCurve from './spline-curve.js';
-
 import {
   AUTO,
   CATEGORICAL,
@@ -106,34 +94,42 @@ import {
   ERROR_IS_DRAWING,
   ERROR_POINTS_NOT_DRAWN,
   FLOAT_BYTES,
-  KEYS,
-  KEY_ACTIONS,
   KEY_ACTION_LASSO,
   KEY_ACTION_MERGE,
   KEY_ACTION_REMOVE,
   KEY_ACTION_ROTATE,
+  KEY_ACTIONS,
   KEY_ALT,
   KEY_CMD,
   KEY_CTRL,
   KEY_META,
   KEY_SHIFT,
+  KEYS,
   LASSO_BRUSH_MIN_MIN_DIST,
   LASSO_CLEAR_EVENTS,
   LASSO_CLEAR_ON_DESELECT,
   LASSO_CLEAR_ON_END,
   LONG_CLICK_TIME,
   MIN_POINT_SIZE,
-  MOUSE_MODES,
   MOUSE_MODE_LASSO,
   MOUSE_MODE_PANZOOM,
   MOUSE_MODE_ROTATE,
+  MOUSE_MODES,
   SINGLE_CLICK_DELAY,
   SKIP_DEPRECATION_VALUE_TRANSLATION,
   VALUE_ZW_DATA_TYPES,
   W_NAMES,
   Z_NAMES,
 } from './constants.js';
-
+import createKdbush from './kdbush.js';
+import createLassoManager from './lasso-manager/index.js';
+import POINT_FS from './point.fs';
+import createVertexShader from './point.vs';
+import POINT_SIMPLE_FS from './point-simple.fs';
+import POINT_UPDATE_FS from './point-update.fs';
+import POINT_UPDATE_VS from './point-update.vs';
+import createRenderer from './renderer.js';
+import createSplineCurve from './spline-curve.js';
 import {
   checkReglExtensions as checkSupport,
   clip,
@@ -165,8 +161,6 @@ import {
   toRgba,
   verticesToPolygon,
 } from './utils.js';
-
-import { version } from '../package.json';
 
 const deprecations = {
   showRecticle: {
@@ -394,9 +388,7 @@ const createScatterplot = (
   let pointConnections;
   let pointConnectionMap;
   let computingPointConnectionCurves;
-  // biome-ignore lint/style/useNamingConvention: HLine stands for HorizontalLine
   let reticleHLine;
-  // biome-ignore lint/style/useNamingConvention: VLine stands for VerticalLine
   let reticleVLine;
   let computedPointSizeMouseDetection;
   let lassoInitiatorTimeout;
@@ -551,9 +543,7 @@ const createScatterplot = (
   let isAnnotationsDrawn = false;
   let isMouseOverCanvasChecked = false;
 
-  // biome-ignore lint/style/useNamingConvention: ZDate is not one word
   let valueZDataType = CATEGORICAL;
-  // biome-ignore lint/style/useNamingConvention: WDate is not one word
   let valueWDataType = CATEGORICAL;
 
   /** @type{number|undefined} */
@@ -627,9 +617,7 @@ const createScatterplot = (
     return points;
   };
 
-  // biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
   const getPointsInBBox = (x0, y0, x1, y1) => {
-    // biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
     const pointsInBBox = spatialIndex.range(x0, y0, x1, y1);
     if (isPointsFiltered) {
       return pointsInBBox.filter((i) => filteredPointsSet.has(i));
@@ -644,7 +632,6 @@ const createScatterplot = (
     const pointSizeNdc = getPointSizeNdc(4);
 
     // Get all points within a close range
-    // biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
     const pointsInBBox = getPointsInBBox(
       xNdc - pointSizeNdc,
       yNdc - pointSizeNdc,
@@ -682,7 +669,6 @@ const createScatterplot = (
     }
 
     // ...to efficiently preselect potentially selected points
-    // biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
     const pointsInBBox = getPointsInBBox(...bBox);
     // next we test each point in the bounding box if it is in the polygon too
     const pointsInPolygon = [];
@@ -1787,10 +1773,8 @@ const createScatterplot = (
       blend: {
         enable: !disableAlphaBlending,
         func: {
-          // biome-ignore lint/style/useNamingConvention: Regl specific
           srcRGB: 'src alpha',
           srcAlpha: 'one',
-          // biome-ignore lint/style/useNamingConvention: Regl specific
           dstRGB: 'one minus src alpha',
           dstAlpha: 'one minus src alpha',
         },
@@ -1931,10 +1915,8 @@ const createScatterplot = (
     blend: {
       enable: true,
       func: {
-        // biome-ignore lint/style/useNamingConvention: Regl specific
         srcRGB: 'src alpha',
         srcAlpha: 'one',
-        // biome-ignore lint/style/useNamingConvention: Regl specific
         dstRGB: 'one minus src alpha',
         dstAlpha: 'one minus src alpha',
       },
@@ -2848,7 +2830,6 @@ const createScatterplot = (
    * @param {number[]} pointIdxs - A list of point indices
    * @returns {import('./types').Rect} The bounding box
    */
-  // biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
   const getBBoxOfPoints = (pointIdxs) => {
     let xMin = Number.POSITIVE_INFINITY;
     let xMax = Number.NEGATIVE_INFINITY;
@@ -2885,7 +2866,6 @@ const createScatterplot = (
       // Vertical field of view
       // The Arc Tangent is based on the original camera position. Otherwise
       // we would have to do `Math.atan(1 / camera.view[5])`
-      // biome-ignore lint/style/useNamingConvention: FOV stands for field of view
       const vFOV = 2 * Math.atan(1);
 
       const aspectRatio = viewAspectRatio / dataAspectRatio;
@@ -3281,7 +3261,6 @@ const createScatterplot = (
     reticleVLine.setStyle({ color: reticleColor });
   };
 
-  // biome-ignore lint/style/useNamingConvention: XScale are two words
   const setXScale = (newXScale) => {
     if (!newXScale) {
       return;
@@ -3294,7 +3273,6 @@ const createScatterplot = (
     updateScales();
   };
 
-  // biome-ignore lint/style/useNamingConvention: YScale are two words
   const setYScale = (newYScale) => {
     if (!newYScale) {
       return;
@@ -3468,7 +3446,6 @@ const createScatterplot = (
     annotationLineWidth = +newAnnotationLineWidth;
   };
 
-  // biome-ignore lint/style/useNamingConvention: HVLine stands for horizontal vertical line
   const setAnnotationHVLineLimit = (newAnnotationHVLineLimit) => {
     annotationHVLineLimit = +newAnnotationHVLineLimit;
   };

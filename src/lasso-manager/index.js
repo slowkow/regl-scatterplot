@@ -9,7 +9,12 @@ import {
   withConstructor,
   withStaticProperty,
 } from '@flekschas/utils';
-
+import {
+  DEFAULT_LASSO_LONG_PRESS_AFTER_EFFECT_TIME,
+  DEFAULT_LASSO_LONG_PRESS_EFFECT_DELAY,
+  DEFAULT_LASSO_LONG_PRESS_REVERT_EFFECT_TIME,
+  DEFAULT_LASSO_LONG_PRESS_TIME,
+} from '../constants.js';
 import {
   DEFAULT_BRUSH_SIZE,
   DEFAULT_LASSO_MIN_DELAY,
@@ -19,13 +24,6 @@ import {
   LASSO_HIDE_START_INITIATOR_TIME,
   LASSO_SHOW_START_INITIATOR_TIME,
 } from './constants.js';
-
-import {
-  DEFAULT_LASSO_LONG_PRESS_AFTER_EFFECT_TIME,
-  DEFAULT_LASSO_LONG_PRESS_EFFECT_DELAY,
-  DEFAULT_LASSO_LONG_PRESS_REVERT_EFFECT_TIME,
-  DEFAULT_LASSO_LONG_PRESS_TIME,
-} from '../constants.js';
 
 import {
   createLongPressInAnimations,

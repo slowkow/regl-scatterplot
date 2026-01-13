@@ -85,7 +85,6 @@ export const dist = (x1, y1, x2, y2) =>
  * @return  {array}  Quadruple of form `[xMin, yMin, xMax, yMax]` defining the
  *  bounding box
  */
-// biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
 export const getBBox = (positions2d) => {
   let xMin = Number.POSITIVE_INFINITY;
   let xMax = Number.NEGATIVE_INFINITY;
@@ -107,7 +106,6 @@ export const getBBox = (positions2d) => {
  * @param   {array}  bBox  The bounding box to be checked
  * @return  {array}  `true` if the bounding box is valid
  */
-// biome-ignore lint/style/useNamingConvention: BBox stands for BoundingBox
 export const isValidBBox = ([xMin, yMin, xMax, yMax]) =>
   Number.isFinite(xMin) &&
   Number.isFinite(yMin) &&
@@ -496,7 +494,6 @@ export const toArrayOrientedPoints = (points) =>
         (Array.isArray(points.line) || ArrayBuffer.isView(points.line)) &&
         ((i) => points.line[i]);
 
-      // biome-ignore lint/style/useNamingConvention: LO stands for line and order
       const getLO =
         (Array.isArray(points.lineOrder) ||
           ArrayBuffer.isView(points.lineOrder)) &&

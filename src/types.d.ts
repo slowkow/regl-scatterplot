@@ -17,7 +17,6 @@ type MouseMode = 'panZoom' | 'lasso' | 'rotate';
 
 type PointScaleMode = 'constant' | 'asinh' | 'linear';
 
-// biome-ignore lint/style/useNamingConvention: ZWData are three words, z, w, and data
 type ZWDataType = 'continuous' | 'categorical';
 
 // biome-ignore lint/suspicious/noExplicitAny: Untyped external library
@@ -95,14 +94,12 @@ interface BaseAnnotation {
   lineWidth?: number;
 }
 
-// biome-ignore lint/style/useNamingConvention: HLine stands for HorizontalLine
 interface AnnotationHLine extends BaseAnnotation {
   y: number;
   x1?: number;
   x2?: number;
 }
 
-// biome-ignore lint/style/useNamingConvention: HLine stands for VerticalLine
 interface AnnotationVLine extends BaseAnnotation {
   x: number;
   y1?: number;
@@ -154,7 +151,6 @@ interface BaseOptions {
   aspectRatio: number;
   annotationLineColor: Color;
   annotationLineWidth: number;
-  // biome-ignore lint/style/useNamingConvention: HVLine stands for HorizontalVerticalLine
   annotationHVLineLimit: number;
   // Nullifiable
   backgroundImage: null | import('regl').Texture2D | string;
@@ -169,7 +165,6 @@ interface BaseOptions {
   pixelAligned: boolean;
 }
 
-// biome-ignore lint/style/useNamingConvention: KDBush is a library name
 export interface CreateKDBushOptions {
   node: number;
   useWorker: boolean;

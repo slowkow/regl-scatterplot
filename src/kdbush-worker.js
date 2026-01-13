@@ -6,7 +6,6 @@ export default () => {
       self.postMessage({ error: new Error('Invalid point data') });
     }
 
-    // biome-ignore lint/correctness/noUndeclaredVariables: KDBush is made available during compilation
     const index = new KDBush(points.length, event.data.nodeSize);
 
     for (const [x, y] of points) {

@@ -1,8 +1,6 @@
-// biome-ignore lint/style/useNamingConvention: KDBush is a library name
 import createKDBushClass from './kdbush-class.js';
 import workerFn from './kdbush-worker.js';
 
-// biome-ignore lint/style/useNamingConvention: KDBush is a library name
 const KDBush = createKDBushClass();
 const WORKER_THRESHOLD = 1000000;
 
@@ -10,7 +8,6 @@ const createWorker = (fn) => {
   const kdbushStr = createKDBushClass.toString();
   const fnStr = fn.toString();
   const workerStr =
-    // biome-ignore lint/style/useTemplate: Prefer one assignment per line
     `const createKDBushClass = ${kdbushStr};` +
     'KDBush = createKDBushClass();' +
     `const createWorker = ${fnStr};` +

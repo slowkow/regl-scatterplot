@@ -106,7 +106,6 @@ const worker = function worker() {
    * @param   {[type]}  simplified  [description]
    * @return  {[type]}  [description]
    */
-  // biome-ignore lint/style/useNamingConvention: DP stands for Douglas Peucker
   const simplifyDPStep = (points, first, last, tolerance, simplified) => {
     let maxDist = tolerance;
     let index;
@@ -214,7 +213,6 @@ const worker = function worker() {
     const groupedPoints = {};
 
     const isOrdered = !Number.isNaN(+points[0][5]);
-    // biome-ignore lint/complexity/noForEach: somehow for .. of does not work in a worker
     points.forEach((point) => {
       const segId = point[4];
 
@@ -230,7 +228,6 @@ const worker = function worker() {
     });
 
     // The filtering ensures that non-existing array entries are removed
-    // biome-ignore lint/complexity/noForEach: somehow for .. of does not work in a worker
     Object.entries(groupedPoints).forEach((idPoints) => {
       groupedPoints[idPoints[0]] = idPoints[1].filter((v) => v);
       // Store the first point as the reference

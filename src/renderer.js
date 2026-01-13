@@ -65,10 +65,8 @@ export const createRenderer = (
     blend: {
       enable: true,
       func: {
-        // biome-ignore lint/style/useNamingConvention: Regl internal
         srcRGB: 'one',
         srcAlpha: 'one',
-        // biome-ignore lint/style/useNamingConvention: Regl internal
         dstRGB: 'one minus src alpha',
         dstAlpha: 'one minus src alpha',
       },
