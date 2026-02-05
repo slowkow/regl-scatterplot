@@ -11,7 +11,8 @@ import earcut from 'earcut';
 import { mat4, vec4 } from 'gl-matrix';
 import createPubSub from 'pub-sub-es';
 import createLine from 'regl-line';
-import { version } from '../package.json';
+// Forked from regl-scatterplot v1.11.2
+const version = '1.11.2-cellguide';
 import BG_FS from './bg.fs';
 import BG_VS from './bg.vs';
 import {
@@ -76,6 +77,8 @@ import {
   DEFAULT_POINT_CONNECTION_SIZE_ACTIVE,
   DEFAULT_POINT_CONNECTION_SIZE_BY,
   DEFAULT_POINT_OUTLINE_WIDTH,
+  DEFAULT_POINT_BODY_OUTLINE_WIDTH,
+  DEFAULT_POINT_BODY_OUTLINE_COLOR,
   DEFAULT_POINT_SCALE_MODE,
   DEFAULT_POINT_SIZE,
   DEFAULT_POINT_SIZE_MOUSE_DETECTION,
@@ -307,6 +310,8 @@ const createScatterplot = (
     pointSizeSelected = DEFAULT_POINT_SIZE_SELECTED,
     pointSizeMouseDetection = DEFAULT_POINT_SIZE_MOUSE_DETECTION,
     pointOutlineWidth = DEFAULT_POINT_OUTLINE_WIDTH,
+    pointBodyOutlineWidth = DEFAULT_POINT_BODY_OUTLINE_WIDTH,
+    pointBodyOutlineColor = DEFAULT_POINT_BODY_OUTLINE_COLOR,
     opacity = AUTO,
     opacityBy = DEFAULT_OPACITY_BY,
     opacityByDensityFill = DEFAULT_OPACITY_BY_DENSITY_FILL,
@@ -1513,6 +1518,19 @@ const createScatterplot = (
     pointOutlineWidth = +newPointOutlineWidth;
   };
 
+  const setPointBodyOutlineWidth = (newWidth) => {
+    if (+newWidth < 0) {
+      return;
+    }
+    pointBodyOutlineWidth = +newWidth;
+  };
+
+  const setPointBodyOutlineColor = (newColor) => {
+    if (newColor && Array.isArray(newColor) && newColor.length >= 3) {
+      pointBodyOutlineColor = toRgba(newColor, true);
+    }
+  };
+
   const setCurrentWidth = (newCurrentWidth, skipScaleUpdates) => {
     currentWidth = Math.max(1, newCurrentWidth);
     canvas.width = Math.floor(currentWidth * window.devicePixelRatio);
@@ -1835,6 +1853,124 @@ const createScatterplot = (
     getNormalNumPoints,
     getNormalPointsIndexBuffer,
   );
+
+  // Fragment shader for point body outlines (fixed color, behind all points)
+  const POINT_BODY_OUTLINE_FS = `
+precision highp float;
+
+uniform float antiAliasing;
+uniform vec4 outlineColor;
+
+varying float finalPointSize;
+
+float linearstep(float edge0, float edge1, float x) {
+  return clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+}
+
+void main() {
+  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  float sdf = length(c) * finalPointSize;
+  float alpha = linearstep(finalPointSize + antiAliasing, finalPointSize - antiAliasing, sdf);
+  gl_FragColor = vec4(outlineColor.rgb, alpha * outlineColor.a);
+}
+`;
+
+  // Vertex shader for point body outlines (includes point size encoding lookup)
+  const POINT_BODY_OUTLINE_VS = `
+precision highp float;
+
+uniform sampler2D stateTex;
+uniform float stateTexRes;
+uniform float stateTexEps;
+uniform sampler2D encodingTex;
+uniform float encodingTexRes;
+uniform float encodingTexEps;
+uniform float devicePixelRatio;
+uniform float pointSizeExtra;
+uniform float pointScale;
+uniform float isSizedByZ;
+uniform float isSizedByW;
+uniform float sizeMultiplicator;
+uniform mat4 modelViewProjection;
+
+attribute vec2 stateIndex;
+
+varying float finalPointSize;
+
+void main() {
+  vec4 state = texture2D(stateTex, stateIndex);
+  gl_Position = modelViewProjection * vec4(state.x, state.y, 0.0, 1.0);
+
+  // Retrieve point size (same logic as main vertex shader)
+  float pointSizeIndexZ = isSizedByZ * floor(state.z * sizeMultiplicator);
+  float pointSizeIndexW = isSizedByW * floor(state.w * sizeMultiplicator);
+  float pointSizeIndex = pointSizeIndexZ + pointSizeIndexW;
+
+  float pointSizeRowIndex = floor((pointSizeIndex + encodingTexEps) / encodingTexRes);
+  vec2 pointSizeTexIndex = vec2(
+    (pointSizeIndex / encodingTexRes) - pointSizeRowIndex + encodingTexEps,
+    pointSizeRowIndex / encodingTexRes + encodingTexEps
+  );
+  float pointSize = texture2D(encodingTex, pointSizeTexIndex).x;
+
+  finalPointSize = (pointSize * pointScale) + pointSizeExtra;
+  gl_PointSize = finalPointSize;
+}
+`;
+
+  // Draw command for point body outlines
+  const drawPointBodyOutlinesCmd = renderer.regl({
+    frag: POINT_BODY_OUTLINE_FS,
+    vert: POINT_BODY_OUTLINE_VS,
+
+    blend: {
+      enable: !disableAlphaBlending,
+      func: {
+        srcRGB: 'src alpha',
+        srcAlpha: 'one',
+        dstRGB: 'one minus src alpha',
+        dstAlpha: 'one minus src alpha',
+      },
+    },
+
+    depth: { enable: false },
+
+    attributes: {
+      stateIndex: {
+        buffer: getNormalPointsIndexBuffer,
+        size: 2,
+      },
+    },
+
+    uniforms: {
+      antiAliasing: getAntiAliasing,
+      modelViewProjection: getModelViewProjection,
+      devicePixelRatio: getDevicePixelRatio,
+      pointScale: () => getPointScale(),
+      pointSizeExtra: () => pointBodyOutlineWidth * 2 * window.devicePixelRatio,
+      stateTex: getStateTex,
+      stateTexRes: getStateTexRes,
+      stateTexEps: getStateTexEps,
+      encodingTex: getEncodingTex,
+      encodingTexRes: getEncodingTexRes,
+      encodingTexEps: getEncodingTexEps,
+      isSizedByZ: getIsSizedByZ,
+      isSizedByW: getIsSizedByW,
+      sizeMultiplicator: getSizeMultiplicator,
+      outlineColor: () => pointBodyOutlineColor,
+    },
+
+    count: getNormalNumPoints,
+
+    primitive: 'points',
+  });
+
+  // Function to draw point body outlines (checks if enabled)
+  const drawPointBodyOutlines = () => {
+    if (pointBodyOutlineWidth > 0) {
+      drawPointBodyOutlinesCmd();
+    }
+  };
 
   const drawHoveredPoint = drawPoints(
     getNormalPointSizeExtra,
@@ -3652,6 +3788,14 @@ const createScatterplot = (
       return pointOutlineWidth;
     }
 
+    if (property === 'pointBodyOutlineWidth') {
+      return pointBodyOutlineWidth;
+    }
+
+    if (property === 'pointBodyOutlineColor') {
+      return pointBodyOutlineColor;
+    }
+
     if (property === 'pointSize') {
       return pointSize.length === 1 ? pointSize[0] : pointSize;
     }
@@ -4058,6 +4202,14 @@ const createScatterplot = (
 
     if (properties.pointOutlineWidth !== undefined) {
       setPointOutlineWidth(properties.pointOutlineWidth);
+    }
+
+    if (properties.pointBodyOutlineWidth !== undefined) {
+      setPointBodyOutlineWidth(properties.pointBodyOutlineWidth);
+    }
+
+    if (properties.pointBodyOutlineColor !== undefined) {
+      setPointBodyOutlineColor(properties.pointBodyOutlineColor);
     }
 
     if (properties.height !== undefined) {
@@ -4496,6 +4648,8 @@ const createScatterplot = (
 
       const numPoints = getNormalNumPoints();
       if (isPointsDrawn && numPoints > 0) {
+        // Draw point body outlines first (behind the main points)
+        drawPointBodyOutlines();
         drawPointBodies();
       }
 

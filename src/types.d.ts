@@ -152,6 +152,9 @@ interface BaseOptions {
   annotationLineColor: Color;
   annotationLineWidth: number;
   annotationHVLineLimit: number;
+  // Global outline behind all points (shows data shape)
+  pointBodyOutlineWidth: number;
+  pointBodyOutlineColor: Color;
   // Nullifiable
   backgroundImage: null | import('regl').Texture2D | string;
   colorBy: null | DataEncoding;

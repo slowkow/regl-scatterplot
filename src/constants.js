@@ -108,6 +108,9 @@ export const DEFAULT_POINT_SCALE_MODE = 'asinh';
 export const DEFAULT_POINT_SIZE = 6;
 export const DEFAULT_POINT_SIZE_SELECTED = 2;
 export const DEFAULT_POINT_OUTLINE_WIDTH = 2;
+// Global outline (appears behind all points to show data shape)
+export const DEFAULT_POINT_BODY_OUTLINE_WIDTH = 0;
+export const DEFAULT_POINT_BODY_OUTLINE_COLOR = [0.22, 0.22, 0.22, 0.8];
 export const DEFAULT_SIZE_BY = null;
 export const DEFAULT_POINT_CONNECTION_SIZE = 2;
 export const DEFAULT_POINT_CONNECTION_SIZE_ACTIVE = 2;
