@@ -1966,8 +1966,9 @@ void main() {
   });
 
   // Function to draw point body outlines (checks if enabled)
+  // Skip drawing outlines when there's an active selection (selectedPoints.length > 0)
   const drawPointBodyOutlines = () => {
-    if (pointBodyOutlineWidth > 0) {
+    if (pointBodyOutlineWidth > 0 && selectedPoints.length === 0) {
       drawPointBodyOutlinesCmd();
     }
   };
