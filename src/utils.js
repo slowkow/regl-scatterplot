@@ -49,6 +49,7 @@ export const createRegl = (canvas) => {
   const gl = canvas.getContext('webgl', {
     antialias: true,
     preserveDrawingBuffer: true,
+    stencil: true, // Enable stencil buffer for outline rendering
   });
   const extensions = [];
 

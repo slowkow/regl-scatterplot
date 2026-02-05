@@ -25,6 +25,7 @@ export const GL_EXTENSIONS = [
 export const CLEAR_OPTIONS = {
   color: [0, 0, 0, 0], // Transparent background color
   depth: 1,
+  stencil: 0, // Clear stencil buffer for outline rendering
 };
 
 export const MOUSE_MODE_PANZOOM = 'panZoom';

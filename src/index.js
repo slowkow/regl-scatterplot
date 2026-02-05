@@ -11,8 +11,10 @@ import earcut from 'earcut';
 import { mat4, vec4 } from 'gl-matrix';
 import createPubSub from 'pub-sub-es';
 import createLine from 'regl-line';
+
 // Forked from regl-scatterplot v1.11.2
 const version = '1.11.2-cellguide';
+
 import BG_FS from './bg.fs';
 import BG_VS from './bg.vs';
 import {
@@ -64,6 +66,8 @@ import {
   DEFAULT_OPACITY_INACTIVE_SCALE,
   DEFAULT_PERFORMANCE_MODE,
   DEFAULT_PIXEL_ALIGNED,
+  DEFAULT_POINT_BODY_OUTLINE_COLOR,
+  DEFAULT_POINT_BODY_OUTLINE_WIDTH,
   DEFAULT_POINT_CONNECTION_COLOR_ACTIVE,
   DEFAULT_POINT_CONNECTION_COLOR_BY,
   DEFAULT_POINT_CONNECTION_COLOR_HOVER,
@@ -77,8 +81,6 @@ import {
   DEFAULT_POINT_CONNECTION_SIZE_ACTIVE,
   DEFAULT_POINT_CONNECTION_SIZE_BY,
   DEFAULT_POINT_OUTLINE_WIDTH,
-  DEFAULT_POINT_BODY_OUTLINE_WIDTH,
-  DEFAULT_POINT_BODY_OUTLINE_COLOR,
   DEFAULT_POINT_SCALE_MODE,
   DEFAULT_POINT_SIZE,
   DEFAULT_POINT_SIZE_MOUSE_DETECTION,
@@ -1854,8 +1856,38 @@ const createScatterplot = (
     getNormalPointsIndexBuffer,
   );
 
-  // Fragment shader for point body outlines (fixed color, behind all points)
-  const POINT_BODY_OUTLINE_FS = `
+  // ============================================================================
+  // STENCIL-BASED POINT BODY OUTLINE RENDERING
+  // ============================================================================
+  // Uses a two-pass stencil buffer approach to render smooth outlines around
+  // the union of all points, avoiding "kinking" artifacts at circle junctions.
+  //
+  // Pass 1 (Stencil Fill): Draw circles at normal size to fill stencil buffer
+  //         with value 1, marking the interior. No color output.
+  // Pass 2 (Outline Draw): Draw enlarged circles, but only where stencil != 1
+  //         (i.e., only the outline ring outside the union is rendered).
+  // ============================================================================
+
+  // Fragment shader for stencil fill pass (outputs solid circle for stencil)
+  const STENCIL_FILL_FS = `
+precision highp float;
+
+uniform float antiAliasing;
+
+varying float finalPointSize;
+
+void main() {
+  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  float dist = length(c) * finalPointSize;
+  // Discard pixels outside the circle
+  if (dist > finalPointSize) discard;
+  // Output white (doesn't matter since color write is disabled, but needed for valid shader)
+  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+}
+`;
+
+  // Fragment shader for outline draw pass (outputs outline color)
+  const OUTLINE_DRAW_FS = `
 precision highp float;
 
 uniform float antiAliasing;
@@ -1875,8 +1907,8 @@ void main() {
 }
 `;
 
-  // Vertex shader for point body outlines (includes point size encoding lookup)
-  const POINT_BODY_OUTLINE_VS = `
+  // Vertex shader for stencil fill pass (normal point size, no extra)
+  const STENCIL_FILL_VS = `
 precision highp float;
 
 uniform sampler2D stateTex;
@@ -1885,7 +1917,48 @@ uniform float stateTexEps;
 uniform sampler2D encodingTex;
 uniform float encodingTexRes;
 uniform float encodingTexEps;
-uniform float devicePixelRatio;
+uniform float pointScale;
+uniform float isSizedByZ;
+uniform float isSizedByW;
+uniform float sizeMultiplicator;
+uniform mat4 modelViewProjection;
+
+attribute vec2 stateIndex;
+
+varying float finalPointSize;
+
+void main() {
+  vec4 state = texture2D(stateTex, stateIndex);
+  gl_Position = modelViewProjection * vec4(state.x, state.y, 0.0, 1.0);
+
+  // Retrieve point size (same logic as main vertex shader)
+  float pointSizeIndexZ = isSizedByZ * floor(state.z * sizeMultiplicator);
+  float pointSizeIndexW = isSizedByW * floor(state.w * sizeMultiplicator);
+  float pointSizeIndex = pointSizeIndexZ + pointSizeIndexW;
+
+  float pointSizeRowIndex = floor((pointSizeIndex + encodingTexEps) / encodingTexRes);
+  vec2 pointSizeTexIndex = vec2(
+    (pointSizeIndex / encodingTexRes) - pointSizeRowIndex + encodingTexEps,
+    pointSizeRowIndex / encodingTexRes + encodingTexEps
+  );
+  float pointSize = texture2D(encodingTex, pointSizeTexIndex).x;
+
+  // Normal point size (no extra for stencil fill)
+  finalPointSize = pointSize * pointScale;
+  gl_PointSize = finalPointSize;
+}
+`;
+
+  // Vertex shader for outline draw pass (enlarged point size)
+  const OUTLINE_DRAW_VS = `
+precision highp float;
+
+uniform sampler2D stateTex;
+uniform float stateTexRes;
+uniform float stateTexEps;
+uniform sampler2D encodingTex;
+uniform float encodingTexRes;
+uniform float encodingTexEps;
 uniform float pointSizeExtra;
 uniform float pointScale;
 uniform float isSizedByZ;
@@ -1913,15 +1986,90 @@ void main() {
   );
   float pointSize = texture2D(encodingTex, pointSizeTexIndex).x;
 
+  // Enlarged point size for outline
   finalPointSize = (pointSize * pointScale) + pointSizeExtra;
   gl_PointSize = finalPointSize;
 }
 `;
 
-  // Draw command for point body outlines
-  const drawPointBodyOutlinesCmd = renderer.regl({
-    frag: POINT_BODY_OUTLINE_FS,
-    vert: POINT_BODY_OUTLINE_VS,
+  // Pass 1: Draw circles to stencil buffer only (no color output)
+  // Marks interior pixels with stencil value 1
+  const drawStencilFillCmd = renderer.regl({
+    frag: STENCIL_FILL_FS,
+    vert: STENCIL_FILL_VS,
+
+    // Disable color output - we only want to write to stencil buffer
+    colorMask: [false, false, false, false],
+
+    // Stencil configuration: always pass, replace stencil with ref value (1)
+    stencil: {
+      enable: true,
+      mask: 0xff,
+      func: {
+        cmp: 'always',
+        ref: 1,
+        mask: 0xff,
+      },
+      op: {
+        fail: 'keep',
+        zfail: 'keep',
+        zpass: 'replace',
+      },
+    },
+
+    blend: { enable: false },
+    depth: { enable: false },
+
+    attributes: {
+      stateIndex: {
+        buffer: getNormalPointsIndexBuffer,
+        size: 2,
+      },
+    },
+
+    uniforms: {
+      antiAliasing: getAntiAliasing,
+      modelViewProjection: getModelViewProjection,
+      pointScale: () => getPointScale(),
+      stateTex: getStateTex,
+      stateTexRes: getStateTexRes,
+      stateTexEps: getStateTexEps,
+      encodingTex: getEncodingTex,
+      encodingTexRes: getEncodingTexRes,
+      encodingTexEps: getEncodingTexEps,
+      isSizedByZ: getIsSizedByZ,
+      isSizedByW: getIsSizedByW,
+      sizeMultiplicator: getSizeMultiplicator,
+    },
+
+    count: getNormalNumPoints,
+    primitive: 'points',
+  });
+
+  // Pass 2: Draw enlarged circles with outline color, but only where stencil != 1
+  // This draws only the outline ring (pixels outside the union of all points)
+  const drawOutlineCmd = renderer.regl({
+    frag: OUTLINE_DRAW_FS,
+    vert: OUTLINE_DRAW_VS,
+
+    // Normal color output with alpha blending
+    colorMask: [true, true, true, true],
+
+    // Stencil configuration: only pass where stencil != 1 (outside the union)
+    stencil: {
+      enable: true,
+      mask: 0xff,
+      func: {
+        cmp: 'notequal',
+        ref: 1,
+        mask: 0xff,
+      },
+      op: {
+        fail: 'keep',
+        zfail: 'keep',
+        zpass: 'keep',
+      },
+    },
 
     blend: {
       enable: !disableAlphaBlending,
@@ -1945,7 +2093,6 @@ void main() {
     uniforms: {
       antiAliasing: getAntiAliasing,
       modelViewProjection: getModelViewProjection,
-      devicePixelRatio: getDevicePixelRatio,
       pointScale: () => getPointScale(),
       pointSizeExtra: () => pointBodyOutlineWidth * 2 * window.devicePixelRatio,
       stateTex: getStateTex,
@@ -1961,15 +2108,19 @@ void main() {
     },
 
     count: getNormalNumPoints,
-
     primitive: 'points',
   });
 
-  // Function to draw point body outlines (checks if enabled)
+  // Function to draw point body outlines using stencil buffer approach
   // Skip drawing outlines when there's an active selection (selectedPoints.length > 0)
   const drawPointBodyOutlines = () => {
     if (pointBodyOutlineWidth > 0 && selectedPoints.length === 0) {
-      drawPointBodyOutlinesCmd();
+      // Clear stencil buffer to 0
+      renderer.regl.clear({ stencil: 0 });
+      // Pass 1: Fill stencil buffer with interior (stencil = 1)
+      drawStencilFillCmd();
+      // Pass 2: Draw outline where stencil != 1
+      drawOutlineCmd();
     }
   };
 
