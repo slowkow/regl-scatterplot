@@ -56,6 +56,10 @@ const deselectHandler = () => {
   selection = [];
 };
 
+// Use URL parameter ?blendMode=average to test average blending (WBOIT)
+const urlParams = new URLSearchParams(window.location.search);
+const blendMode = urlParams.get('blendMode') || 'alpha';
+
 const scatterplot = createScatterplot({
   canvas,
   lassoMinDelay,
@@ -65,7 +69,8 @@ const scatterplot = createScatterplot({
   reticleColor,
   opacity,
   lassoOnLongPress: true,
-  lassoType: 'brush'
+  lassoType: 'brush',
+  blendMode,
 });
 
 checkSupport(scatterplot);

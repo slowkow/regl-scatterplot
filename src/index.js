@@ -19,6 +19,7 @@ import BG_FS from './bg.fs';
 import BG_VS from './bg.vs';
 import {
   AUTO,
+  BLEND_MODE_AVERAGE,
   CATEGORICAL,
   COLOR_ACTIVE_IDX,
   COLOR_BG_IDX,
@@ -32,6 +33,7 @@ import {
   DEFAULT_ANNOTATION_LINE_WIDTH,
   DEFAULT_ANTI_ALIASING,
   DEFAULT_BACKGROUND_IMAGE,
+  DEFAULT_BLEND_MODE,
   DEFAULT_CAMERA_IS_FIXED,
   DEFAULT_COLOR_ACTIVE,
   DEFAULT_COLOR_BG,
@@ -130,7 +132,9 @@ import createKdbush from './kdbush.js';
 import createLassoManager from './lasso-manager/index.js';
 import POINT_FS from './point.fs';
 import createVertexShader from './point.vs';
+import POINT_ACCUM_FS from './point-accum.fs';
 import POINT_SIMPLE_FS from './point-simple.fs';
+import POINT_SIMPLE_ACCUM_FS from './point-simple-accum.fs';
 import POINT_UPDATE_FS from './point-update.fs';
 import POINT_UPDATE_VS from './point-update.vs';
 import createRenderer from './renderer.js';
@@ -337,6 +341,7 @@ const createScatterplot = (
     performanceMode = DEFAULT_PERFORMANCE_MODE,
     opacityByDensityDebounceTime = DEFAULT_OPACITY_BY_DENSITY_DEBOUNCE_TIME,
     spatialIndexUseWorker = DEFAULT_SPATIAL_INDEX_USE_WORKER,
+    blendMode = DEFAULT_BLEND_MODE,
   } = initialProperties;
 
   const renderPointsAsSquares = Boolean(
@@ -345,6 +350,7 @@ const createScatterplot = (
   const disableAlphaBlending = Boolean(
     initialProperties.disableAlphaBlending || performanceMode,
   );
+  const useAverageBlend = blendMode === BLEND_MODE_AVERAGE;
 
   mouseMode = limit(MOUSE_MODES, MOUSE_MODE_PANZOOM)(mouseMode);
 
@@ -352,6 +358,7 @@ const createScatterplot = (
     renderer = createRenderer({
       regl: initialProperties.regl,
       gamma: initialProperties.gamma,
+      blendMode,
     });
   }
 
@@ -1778,6 +1785,16 @@ const createScatterplot = (
     count: 3,
   });
 
+  // Select appropriate fragment shader based on blend mode and point shape
+  const getPointFragShader = (forceStandard) => {
+    if (renderPointsAsSquares) {
+      return useAverageBlend && !forceStandard
+        ? POINT_SIMPLE_ACCUM_FS
+        : POINT_SIMPLE_FS;
+    }
+    return useAverageBlend && !forceStandard ? POINT_ACCUM_FS : POINT_FS;
+  };
+
   const drawPoints = (
     getPointSizeExtra,
     getNumPoints,
@@ -1785,19 +1802,30 @@ const createScatterplot = (
     globalState = COLOR_NORMAL_IDX,
     getPointOpacityMax = getPointOpacityMaxBase,
     getPointOpacityScale = getPointOpacityScaleBase,
+    forceStandardBlend = false,
   ) =>
     renderer.regl({
-      frag: renderPointsAsSquares ? POINT_SIMPLE_FS : POINT_FS,
+      frag: getPointFragShader(forceStandardBlend),
       vert: createVertexShader(globalState),
 
       blend: {
         enable: !disableAlphaBlending,
-        func: {
-          srcRGB: 'src alpha',
-          srcAlpha: 'one',
-          dstRGB: 'one minus src alpha',
-          dstAlpha: 'one minus src alpha',
-        },
+        func:
+          useAverageBlend && !forceStandardBlend
+            ? {
+                // Additive blending for WBOIT accumulation
+                srcRGB: 'one',
+                srcAlpha: 'one',
+                dstRGB: 'one',
+                dstAlpha: 'one',
+              }
+            : {
+                // Standard alpha blending
+                srcRGB: 'src alpha',
+                srcAlpha: 'one',
+                dstRGB: 'one minus src alpha',
+                dstAlpha: 'one minus src alpha',
+              },
       },
 
       depth: { enable: false },
@@ -2124,6 +2152,7 @@ void main() {
     }
   };
 
+  // Hovered and selected points always use standard blending for visibility
   const drawHoveredPoint = drawPoints(
     getNormalPointSizeExtra,
     () => 1,
@@ -2131,6 +2160,7 @@ void main() {
     COLOR_HOVER_IDX,
     () => 1,
     () => 1,
+    true, // forceStandardBlend
   );
 
   const drawSelectedPointOutlines = drawPoints(
@@ -2140,6 +2170,7 @@ void main() {
     COLOR_ACTIVE_IDX,
     () => 1,
     () => 1,
+    true, // forceStandardBlend
   );
 
   const drawSelectedPointInnerBorder = drawPoints(
@@ -2149,6 +2180,7 @@ void main() {
     COLOR_BG_IDX,
     () => 1,
     () => 1,
+    true, // forceStandardBlend
   );
 
   const drawSelectedPointBodies = drawPoints(
@@ -2158,6 +2190,7 @@ void main() {
     COLOR_ACTIVE_IDX,
     () => 1,
     () => 1,
+    true, // forceStandardBlend
   );
 
   const drawSelectedPoints = () => {
@@ -4064,6 +4097,10 @@ void main() {
 
     if (property === 'disableAlphaBlending') {
       return disableAlphaBlending;
+    }
+
+    if (property === 'blendMode') {
+      return blendMode;
     }
 
     if (property === 'gamma') {

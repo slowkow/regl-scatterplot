@@ -169,6 +169,12 @@ export const DEFAULT_POINT_CONNECTION_MAX_INT_POINTS_PER_SEGMENT = 100;
 export const DEFAULT_POINT_CONNECTION_INT_POINTS_TOLERANCE = 1 / 500;
 export const DEFAULT_POINT_SIZE_MOUSE_DETECTION = 'auto';
 export const DEFAULT_PERFORMANCE_MODE = false;
+
+// Blend modes for handling overlapping points
+export const BLEND_MODE_ALPHA = 'alpha';
+export const BLEND_MODE_AVERAGE = 'average';
+export const BLEND_MODES = [BLEND_MODE_ALPHA, BLEND_MODE_AVERAGE];
+export const DEFAULT_BLEND_MODE = BLEND_MODE_ALPHA;
 export const SINGLE_CLICK_DELAY = 200;
 export const LONG_CLICK_TIME = 500;
 export const Z_NAMES = new Set(['z', 'valueZ', 'valueA', 'value1', 'category']);

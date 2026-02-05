@@ -15,6 +15,8 @@ type KeyMap = Record<'alt' | 'cmd' | 'ctrl' | 'meta' | 'shift', KeyAction>;
 
 type MouseMode = 'panZoom' | 'lasso' | 'rotate';
 
+type BlendMode = 'alpha' | 'average';
+
 type PointScaleMode = 'constant' | 'asinh' | 'linear';
 
 type ZWDataType = 'continuous' | 'categorical';
@@ -196,6 +198,7 @@ export type RendererOptions = {
   regl: import('regl').Regl;
   canvas: HTMLCanvasElement;
   gamma: number;
+  blendMode: BlendMode;
 };
 
 export type Properties = {
@@ -210,6 +213,7 @@ export type Properties = {
   performanceMode: boolean;
   renderPointsAsSquares: boolean;
   disableAlphaBlending: boolean;
+  blendMode: BlendMode;
   opacityByDensityDebounceTime: number;
   spatialIndex: ArrayBuffer;
   spatialIndexUseWorker: undefined | boolean;

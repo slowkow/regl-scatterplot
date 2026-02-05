@@ -1,4 +1,9 @@
-import { CLEAR_OPTIONS, DEFAULT_GAMMA } from './constants.js';
+import {
+  BLEND_MODE_AVERAGE,
+  CLEAR_OPTIONS,
+  DEFAULT_BLEND_MODE,
+  DEFAULT_GAMMA,
+} from './constants.js';
 import { checkReglExtensions, createRegl } from './utils.js';
 
 export const createRenderer = (
@@ -8,7 +13,10 @@ export const createRenderer = (
     regl,
     canvas = document.createElement('canvas'),
     gamma = DEFAULT_GAMMA,
+    blendMode = DEFAULT_BLEND_MODE,
   } = options;
+
+  const useAverageBlend = blendMode === BLEND_MODE_AVERAGE;
 
   let isDestroyed = false;
 
@@ -27,11 +35,11 @@ export const createRenderer = (
   });
 
   /**
-   * Render the float32 framebuffer to the internal canvas
+   * Render the float32 framebuffer to the internal canvas (standard alpha mode)
    *
    * From https://observablehq.com/@rreusser/selecting-the-right-opacity-for-2d-point-clouds
    */
-  const renderToCanvas = regl({
+  const renderToCanvasAlpha = regl({
     vert: `
       precision highp float;
       attribute vec2 xy;
@@ -72,6 +80,72 @@ export const createRenderer = (
       },
     },
   });
+
+  /**
+   * Render the float32 framebuffer to the internal canvas (average blend mode)
+   *
+   * This shader performs WBOIT normalization: it divides the accumulated
+   * pre-multiplied color by the accumulated alpha to produce a mathematical
+   * average of all overlapping point colors.
+   */
+  const renderToCanvasAverage = regl({
+    vert: `
+      precision highp float;
+      attribute vec2 xy;
+      void main () {
+        gl_Position = vec4(xy, 0, 1);
+      }`,
+    frag: `
+      precision highp float;
+      uniform vec2 srcRes;
+      uniform sampler2D src;
+      uniform float gamma;
+
+      vec3 approxLinearToSRGB (vec3 rgb, float gamma) {
+        return pow(clamp(rgb, vec3(0), vec3(1)), vec3(1.0 / gamma));
+      }
+
+      void main () {
+        vec4 accum = texture2D(src, gl_FragCoord.xy / srcRes);
+
+        // If no points touched this pixel, discard
+        if (accum.a <= 1e-5) {
+          discard;
+        }
+
+        // WBOIT normalization: divide accumulated color by accumulated alpha
+        vec3 averageColor = accum.rgb / accum.a;
+
+        // Compute total opacity (clamped to [0, 1])
+        float totalOpacity = clamp(accum.a, 0.0, 1.0);
+
+        gl_FragColor = vec4(approxLinearToSRGB(averageColor, gamma), totalOpacity);
+      }`,
+    attributes: {
+      xy: [-4, -4, 4, -4, 0, 4],
+    },
+    uniforms: {
+      src: () => fbo,
+      srcRes: () => fboRes,
+      gamma: () => gamma,
+    },
+    count: 3,
+    depth: { enable: false },
+    blend: {
+      enable: true,
+      func: {
+        srcRGB: 'one',
+        srcAlpha: 'one',
+        dstRGB: 'one minus src alpha',
+        dstAlpha: 'one minus src alpha',
+      },
+    },
+  });
+
+  // Select the appropriate render function based on blend mode
+  const renderToCanvas = useAverageBlend
+    ? renderToCanvasAverage
+    : renderToCanvasAlpha;
 
   /**
    * Copy the pixels from the internal canvas onto the target canvas
@@ -238,6 +312,13 @@ export const createRenderer = (
      */
     get isDestroyed() {
       return isDestroyed;
+    },
+    /**
+     * Get the blend mode
+     * @return {string} The blend mode ('alpha' or 'average')
+     */
+    get blendMode() {
+      return blendMode;
     },
     render,
     resize,
