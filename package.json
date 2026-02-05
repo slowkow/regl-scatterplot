@@ -1,6 +1,6 @@
 {
   "name": "regl-scatterplot",
-  "version": "1.15.0",
+  "version": "1.15.0-cellguide",
   "description": "A WebGL-Powered Scalable Interactive Scatter Plot Library",
   "author": "Fritz Lekschas",
   "keywords": [
@@ -13,9 +13,15 @@
   ],
   "license": "MIT",
   "type": "module",
-  "main": "dist/regl-scatterplot.js",
-  "module": "dist/regl-scatterplot.esm.js",
-  "types": "dist/regl-scatterplot.esm.d.ts",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/types.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/types.d.ts"
+    }
+  },
   "files": [
     "src/*",
     "dist/*"
